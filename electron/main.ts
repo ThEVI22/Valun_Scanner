@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'node:path'
+import { ScannerEngine } from '../engine/core'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -40,6 +41,28 @@ function createWindow() {
   win.once('ready-to-show', () => {
     win?.show()
   })
+
+  // Setup IPC Handlers
+  ipcMain.handle('select-directory', async () => {
+    if (!win) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+      title: 'Select Project to Scan'
+    });
+    
+    if (canceled) { return null; }
+    return filePaths[0];
+  });
+
+  ipcMain.handle('run-scan', async (event, dirPath) => {
+    try {
+      const scanner = new ScannerEngine(dirPath);
+      const results = await scanner.runScan();
+      return { success: true, results };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 app.on('window-all-closed', () => {
